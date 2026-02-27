@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VoteSecure — Admin</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .admin-layout {
+    display: grid; grid-template-columns: 220px 1fr;
+    gap: 2rem; align-items: start;
+  }
+
+  /* SIDEBAR */
+  .sidebar {
+    background: var(--ink); border-radius: 4px;
+    padding: 1.5rem; position: sticky; top: 80px;
+    border-bottom: 2px solid var(--gold);
+  }
+  .sidebar-title {
+    font-family: 'DM Mono', monospace; font-size: .6rem;
+    letter-spacing: 2px; text-transform: uppercase;
+    color: rgba(255,255,255,.25); margin-bottom: 1rem; padding-bottom: .7rem;
+    border-bottom: 1px solid rgba(255,255,255,.06);
+  }
+  .sidebar-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 14px; border-radius: 3px; cursor: pointer;
+    font-family: 'DM Mono', monospace; font-size: .7rem;
+    letter-spacing: 1px; text-transform: uppercase;
+    color: rgba(255,255,255,.45); transition: all .2s;
+    border: none; background: none; width: 100%;
+    text-align: left;
+  }
+  .sidebar-item:hover { color: var(--paper); background: rgba(255,255,255,.05); }
+  .sidebar-item.active { color: var(--gold); background: rgba(200,168,75,.1); }
+  .sidebar-item .count {
+    margin-left: auto;
+    background: rgba(255,255,255,.1); color: rgba(255,255,255,.5);
+    padding: 2px 8px; border-radius: 100px;
+    font-size: .6rem;
+  }
+  .sidebar-item.active .count { background: var(--gold-dim); color: var(--gold); }
+
+  /* PANELS */
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* INLINE EDIT */
+  .editable-select {
+    padding: 5px 10px; font-size: .75rem;
+    border: 1.5px solid var(--border); border-radius: 3px;
+    background: var(--paper); cursor: pointer; outline: none;
+    font-family: 'DM Mono', monospace;
+  }
+  .editable-select:focus { border-color: var(--gold); }
+
+  /* VOTER TABLE EXTRAS */
+  .voter-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: var(--ink); display: inline-flex;
+    align-items: center; justify-content: center;
+    font-family: 'Bebas Neue', sans-serif; font-size: .85rem;
+    color: var(--gold); margin-right: 10px; vertical-align: middle;
+    flex-shrink: 0;
+  }
+
+  /* VOTE LOG */
+  .vote-log-row { position: relative; }
+  .vote-log-row td:first-child { font-family: 'DM Mono', monospace; font-size: .7rem; color: var(--muted); }
+
+  /* Action bar */
+  .action-bar {
+    display: flex; align-items: center; gap: 1rem;
+    margin-bottom: 1.2rem; flex-wrap: wrap;
+  }
+  .action-bar .spacer { flex: 1; }
+
+  /* Alert box */
+  .alert {
+    padding: 1rem 1.4rem; border-radius: 3px;
+    font-size: .82rem; margin-bottom: 1rem;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .alert-danger { background: rgba(192,57,43,.08); border: 1px solid rgba(192,57,43,.2); color: var(--danger); }
+  .alert-success { background: rgba(45,122,79,.08); border: 1px solid rgba(45,122,79,.2); color: var(--success); }
+
+  @media (max-width: 800px) {
+    .admin-layout { grid-template-columns: 1fr; }
+    .sidebar { position: static; display: flex; flex-wrap: wrap; gap: .3rem; padding: 1rem; }
+    .sidebar-title { display: none; }
+    .sidebar-item { flex: 1 0 auto; justify-content: center; padding: 8px; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="nav-logo" href="index.html">Vote<span>Secure</span></a>
+  <div class="nav-links">
+    <a href="admin.html" class="active">Admin</a>
+    <a href="results.html">Results</a>
+    <span class="nav-user">Administrator</span>
+    <button class="nav-logout" onclick="doLogout()">Logout</button>
+  </div>
+</nav>
+
+<div class="page-wrap">
+
+  <div class="page-header">
+    <div class="page-header-left">
+      <h1>Admin Dashboard</h1>
+      <div class="sub">Manage elections, voters, candidates & constituencies</div>
+    </div>
+    <span class="badge badge-active" style="font-size:.72rem; padding:6px 14px;">⚙ Admin Access</span>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-grid" id="adminStats"></div>
+
+  <div class="admin-layout">
+
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+      <div class="sidebar-title">Management</div>
+      <button class="sidebar-item active" id="sideElections" onclick="switchPanel('elections', this)">🗳 Elections <span class="count" id="cntElections">0</span></button>
+      <button class="sidebar-item" id="sideCandidates" onclick="switchPanel('candidates', this)">👤 Candidates <span class="count" id="cntCandidates">0</span></button>
+      <button class="sidebar-item" id="sideVoters" onclick="switchPanel('voters', this)">🏛 Voters <span class="count" id="cntVoters">0</span></button>
+      <button class="sidebar-item" id="sideConstituencies" onclick="switchPanel('constituencies', this)">📍 Constituencies <span class="count" id="cntConstituencies">0</span></button>
+      <button class="sidebar-item" id="sideVotelog" onclick="switchPanel('votelog', this)">📋 Vote Log <span class="count" id="cntVotelog">0</span></button>
+    </div>
+
+    <!-- MAIN PANEL -->
+    <div>
+
+      <!-- ── ELECTIONS ── -->
+      <div class="panel active" id="panel-elections">
+        <div class="action-bar">
+          <div style="font-family:'Bebas Neue',sans-serif; font-size:1.4rem; letter-spacing:2px;">Elections</div>
+          <div class="spacer"></div>
+          <button class="btn btn-primary" onclick="openModal('election')">+ New Election</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>Start Date</th><th>End Date</th><th>Status</th><th>Candidates</th><th>Votes</th><th>Actions</th></tr></thead>
+            <tbody id="electionTbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── CANDIDATES ── -->
+      <div class="panel" id="panel-candidates">
+        <div class="action-bar">
+          <div style="font-family:'Bebas Neue',sans-serif; font-size:1.4rem; letter-spacing:2px;">Candidates</div>
+          <div class="spacer"></div>
+          <select id="candElecFilter" onchange="renderCandidates()" style="padding:8px 12px; font-size:.78rem; border:1.5px solid var(--border); border-radius:3px; background:var(--paper);">
+            <option value="">All Elections</option>
+          </select>
+          <button class="btn btn-primary" onclick="openModal('candidate')">+ Add Candidate</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>Name</th><th>Party</th><th>Election</th><th>Constituency</th><th>Votes Received</th><th>Actions</th></tr></thead>
+            <tbody id="candidateTbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── VOTERS ── -->
+      <div class="panel" id="panel-voters">
+        <div class="action-bar">
+          <div style="font-family:'Bebas Neue',sans-serif; font-size:1.4rem; letter-spacing:2px;">Voters</div>
+          <div class="spacer"></div>
+          <input type="text" id="voterSearch" placeholder="Search name or NID…" style="max-width:240px;" oninput="renderVoters()">
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>Full Name</th><th>National ID</th><th>Email</th><th>Date of Birth</th><th>Status</th><th>Votes Cast</th><th>Actions</th></tr></thead>
+            <tbody id="voterTbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── CONSTITUENCIES ── -->
+      <div class="panel" id="panel-constituencies">
+        <div class="action-bar">
+          <div style="font-family:'Bebas Neue',sans-serif; font-size:1.4rem; letter-spacing:2px;">Constituencies</div>
+          <div class="spacer"></div>
+          <button class="btn btn-primary" onclick="openModal('constituency')">+ Add Constituency</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>Name</th><th>Region</th><th>Candidates</th><th>Actions</th></tr></thead>
+            <tbody id="constituencyTbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── VOTE LOG ── -->
+      <div class="panel" id="panel-votelog">
+        <div class="action-bar">
+          <div style="font-family:'Bebas Neue',sans-serif; font-size:1.4rem; letter-spacing:2px;">Vote Audit Log</div>
+          <div class="spacer"></div>
+          <select id="voteLogFilter" onchange="renderVoteLog()" style="padding:8px 12px; font-size:.78rem; border:1.5px solid var(--border); border-radius:3px; background:var(--paper);">
+            <option value="">All Elections</option>
+          </select>
+        </div>
+        <div class="alert alert-success">
+          🔒 All votes are anonymized in the audit log for voter privacy. Voter identity is shown for administrative purposes only.
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Vote ID</th><th>Voter</th><th>Candidate</th><th>Party</th><th>Election</th><th>Constituency</th><th>Timestamp</th></tr></thead>
+            <tbody id="votelogTbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- /main panel -->
+  </div><!-- /admin-layout -->
+</div><!-- /page-wrap -->
+
+<!-- ══════════ MODALS ══════════ -->
+
+<!-- ADD ELECTION -->
+<div class="modal-overlay" id="modal-election">
+  <div class="modal">
+    <h2 id="electionModalTitle">New Election</h2>
+    <p class="modal-sub">Configure the election event details.</p>
+    <input type="hidden" id="editElectionId">
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Start Date</label>
+        <input type="date" id="elecStart">
+      </div>
+      <div class="form-group">
+        <label>End Date</label>
+        <input type="date" id="elecEnd">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Status</label>
+      <select id="elecStatus">
+        <option value="pending">Pending</option>
+        <option value="active">Active</option>
+        <option value="closed">Closed</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="saveElection()">Save Election</button>
+      <button class="btn btn-outline" onclick="closeModal('election')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD CANDIDATE -->
+<div class="modal-overlay" id="modal-candidate">
+  <div class="modal">
+    <h2>Add Candidate</h2>
+    <p class="modal-sub">Register a new candidate for an election.</p>
+    <div class="form-group">
+      <label>Full Name</label>
+      <input type="text" id="candName" placeholder="Candidate's full name">
+    </div>
+    <div class="form-group">
+      <label>Party</label>
+      <input type="text" id="candParty" placeholder="Political party name">
+    </div>
+    <div class="form-group">
+      <label>Election</label>
+      <select id="candElection"></select>
+    </div>
+    <div class="form-group">
+      <label>Constituency</label>
+      <select id="candConstituency"></select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="saveCandidate()">Save Candidate</button>
+      <button class="btn btn-outline" onclick="closeModal('candidate')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD CONSTITUENCY -->
+<div class="modal-overlay" id="modal-constituency">
+  <div class="modal">
+    <h2>Add Constituency</h2>
+    <p class="modal-sub">Define a new voting constituency.</p>
+    <div class="form-group">
+      <label>Constituency Name</label>
+      <input type="text" id="constName" placeholder="e.g. Central Lagos">
+    </div>
+    <div class="form-group">
+      <label>Region / State</label>
+      <input type="text" id="constRegion" placeholder="e.g. Lagos">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="saveConstituency()">Save Constituency</button>
+      <button class="btn btn-outline" onclick="closeModal('constituency')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM DELETE -->
+<div class="modal-overlay" id="modal-delete">
+  <div class="modal" style="border-top-color:var(--danger);">
+    <h2>Confirm Deletion</h2>
+    <p class="modal-sub" id="deleteMsg">Are you sure you want to delete this item? This action cannot be undone.</p>
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="deleteConfirmBtn">Delete</button>
+      <button class="btn btn-outline" onclick="closeModal('delete')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script src="shared.js"></script>
+<script>
+  // ── AUTH ──
+  requireAdminAuth();
+
+  let db;
+  function doLogout() { clearSession(); window.location.href = 'index.html'; }
+
+  function init() {
+    db = getDB();
+    renderStats();
+    renderElections();
+    renderCandidates();
+    renderVoters();
+    renderConstituencies();
+    renderVoteLog();
+    updateSidebarCounts();
+    populateFilters();
+  }
+
+  // ── STATS ──
+  function renderStats() {
+    const active = db.elections.filter(e => e.status === 'active').length;
+    const totalVoters = db.voters.filter(v => v.status === 'active').length;
+    document.getElementById('adminStats').innerHTML = `
+      <div class="stat-card"><div class="stat-value">${db.voters.length}</div><div class="stat-label">Total Voters</div></div>
+      <div class="stat-card"><div class="stat-value">${totalVoters}</div><div class="stat-label">Active Voters</div></div>
+      <div class="stat-card"><div class="stat-value">${db.elections.length}</div><div class="stat-label">Elections</div></div>
+      <div class="stat-card"><div class="stat-value">${active}</div><div class="stat-label">Active Elections</div></div>
+      <div class="stat-card"><div class="stat-value">${db.candidates.length}</div><div class="stat-label">Candidates</div></div>
+      <div class="stat-card"><div class="stat-value">${db.votes.length}</div><div class="stat-label">Votes Cast</div></div>
+      <div class="stat-card"><div class="stat-value">${db.constituencies.length}</div><div class="stat-label">Constituencies</div></div>
+      <div class="stat-card"><div class="stat-value">${totalVoters > 0 ? Math.round(db.votes.filter((v,i,arr)=>arr.findIndex(x=>x.voterId===v.voterId)===i).length / totalVoters * 100) : 0}%</div><div class="stat-label">Turnout Rate</div></div>
+    `;
+  }
+
+  function updateSidebarCounts() {
+    document.getElementById('cntElections').textContent      = db.elections.length;
+    document.getElementById('cntCandidates').textContent     = db.candidates.length;
+    document.getElementById('cntVoters').textContent         = db.voters.length;
+    document.getElementById('cntConstituencies').textContent = db.constituencies.length;
+    document.getElementById('cntVotelog').textContent        = db.votes.length;
+  }
+
+  function populateFilters() {
+    const candFilter = document.getElementById('candElecFilter');
+    candFilter.innerHTML = '<option value="">All Elections</option>' +
+      db.elections.map(e => `<option value="${e.id}">Election #${e.id} — ${e.status}</option>`).join('');
+
+    const voteFilter = document.getElementById('voteLogFilter');
+    voteFilter.innerHTML = '<option value="">All Elections</option>' +
+      db.elections.map(e => `<option value="${e.id}">Election #${e.id}</option>`).join('');
+  }
+
+  // ── PANEL SWITCH ──
+  function switchPanel(name, btn) {
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.sidebar-item').forEach(b => b.classList.remove('active'));
+    document.getElementById('panel-' + name).classList.add('active');
+    btn.classList.add('active');
+  }
+
+  // ── ELECTIONS TABLE ──
+  function renderElections() {
+    document.getElementById('electionTbody').innerHTML = db.elections.map(e => {
+      const candCount = db.candidates.filter(c => c.electionId === e.id).length;
+      const voteCount = db.votes.filter(v => v.electionId === e.id).length;
+      return `<tr>
+        <td class="mono">#${e.id}</td>
+        <td>${e.startDate}</td>
+        <td>${e.endDate}</td>
+        <td>
+          <select class="editable-select" onchange="updateElectionStatus(${e.id}, this.value)">
+            <option value="pending"  ${e.status==='pending'  ?'selected':''}>Pending</option>
+            <option value="active"   ${e.status==='active'   ?'selected':''}>Active</option>
+            <option value="closed"   ${e.status==='closed'   ?'selected':''}>Closed</option>
+          </select>
+        </td>
+        <td class="mono">${candCount}</td>
+        <td class="mono">${voteCount}</td>
+        <td>
+          <button class="btn btn-outline btn-sm" onclick="editElection(${e.id})">Edit</button>
+          <button class="btn btn-danger btn-sm" style="margin-left:4px;" onclick="confirmDelete('election', ${e.id})">Delete</button>
+        </td>
+      </tr>`;
+    }).join('') || `<tr><td colspan="7"><div class="empty-state">No elections created yet.</div></td></tr>`;
+  }
+
+  // ── CANDIDATES TABLE ──
+  function renderCandidates() {
+    const filter = document.getElementById('candElecFilter').value;
+    let candidates = db.candidates;
+    if (filter) candidates = candidates.filter(c => c.electionId == filter);
+    document.getElementById('candidateTbody').innerHTML = candidates.map(c => {
+      const el  = db.elections.find(e => e.id === c.electionId);
+      const con = db.constituencies.find(co => co.id === c.constituencyId);
+      const votes = db.votes.filter(v => v.candidateId === c.id).length;
+      return `<tr>
+        <td class="mono">#${c.id}</td>
+        <td><strong>${c.fullName}</strong></td>
+        <td>${c.party}</td>
+        <td>${el ? `Election #${el.id}` : '—'}</td>
+        <td>${con ? con.name : '—'}</td>
+        <td class="mono">${votes}</td>
+        <td><button class="btn btn-danger btn-sm" onclick="confirmDelete('candidate', ${c.id})">Remove</button></td>
+      </tr>`;
+    }).join('') || `<tr><td colspan="7"><div class="empty-state">No candidates found.</div></td></tr>`;
+  }
+
+  // ── VOTERS TABLE ──
+  function renderVoters() {
+    const q = (document.getElementById('voterSearch').value || '').toLowerCase();
+    let voters = db.voters;
+    if (q) voters = voters.filter(v =>
+      v.fullName.toLowerCase().includes(q) || v.nationalId.toLowerCase().includes(q)
+    );
+    document.getElementById('voterTbody').innerHTML = voters.map(v => {
+      const voteCount = db.votes.filter(vote => vote.voterId === v.id).length;
+      return `<tr>
+        <td class="mono">#${v.id}</td>
+        <td>
+          <span class="voter-avatar">${initials(v.fullName)}</span>
+          <strong>${v.fullName}</strong>
+        </td>
+        <td class="mono">${v.nationalId}</td>
+        <td>${v.email}</td>
+        <td class="mono">${v.dob}</td>
+        <td>${badgeHTML(v.status)}</td>
+        <td class="mono">${voteCount}</td>
+        <td>
+          <button class="btn btn-outline btn-sm" onclick="toggleVoter(${v.id})">${v.status==='active'?'Deactivate':'Activate'}</button>
+          <button class="btn btn-danger btn-sm" style="margin-left:4px;" onclick="confirmDelete('voter', ${v.id})">Delete</button>
+        </td>
+      </tr>`;
+    }).join('') || `<tr><td colspan="8"><div class="empty-state">No voters found.</div></td></tr>`;
+  }
+
+  // ── CONSTITUENCIES TABLE ──
+  function renderConstituencies() {
+    document.getElementById('constituencyTbody').innerHTML = db.constituencies.map(c => {
+      const candCount = db.candidates.filter(ca => ca.constituencyId === c.id).length;
+      return `<tr>
+        <td class="mono">#${c.id}</td>
+        <td><strong>${c.name}</strong></td>
+        <td>${c.region}</td>
+        <td class="mono">${candCount}</td>
+        <td><button class="btn btn-danger btn-sm" onclick="confirmDelete('constituency', ${c.id})">Remove</button></td>
+      </tr>`;
+    }).join('') || `<tr><td colspan="5"><div class="empty-state">No constituencies found.</div></td></tr>`;
+  }
+
+  // ── VOTE LOG ──
+  function renderVoteLog() {
+    const filter = document.getElementById('voteLogFilter').value;
+    let votes = db.votes;
+    if (filter) votes = votes.filter(v => v.electionId == filter);
+    document.getElementById('votelogTbody').innerHTML = votes.map(v => {
+      const voter = db.voters.find(vo => vo.id === v.voterId);
+      const cand  = db.candidates.find(c => c.id === v.candidateId);
+      const con   = cand ? db.constituencies.find(c => c.id === cand.constituencyId) : null;
+      return `<tr class="vote-log-row">
+        <td>VT-${String(v.id).padStart(6,'0')}</td>
+        <td>${voter ? voter.fullName : '—'}</td>
+        <td>${cand ? cand.fullName : '—'}</td>
+        <td>${cand ? cand.party : '—'}</td>
+        <td class="mono">Election #${v.electionId}</td>
+        <td>${con ? con.name : '—'}</td>
+        <td class="mono" style="font-size:.7rem;">${new Date(v.time).toLocaleString()}</td>
+      </tr>`;
+    }).join('') || `<tr><td colspan="7"><div class="empty-state">No votes recorded yet.</div></td></tr>`;
+  }
+
+  // ── CRUD ──
+  function updateElectionStatus(id, status) {
+    const e = db.elections.find(e => e.id === id);
+    if (e) { e.status = status; saveDB(db); renderStats(); updateSidebarCounts(); toast('Status updated'); }
+  }
+
+  function editElection(id) {
+    const e = db.elections.find(e => e.id === id);
+    document.getElementById('electionModalTitle').textContent = 'Edit Election #' + id;
+    document.getElementById('editElectionId').value = id;
+    document.getElementById('elecStart').value  = e.startDate;
+    document.getElementById('elecEnd').value    = e.endDate;
+    document.getElementById('elecStatus').value = e.status;
+    openModal('election');
+  }
+
+  function saveElection() {
+    const start  = document.getElementById('elecStart').value;
+    const end    = document.getElementById('elecEnd').value;
+    const status = document.getElementById('elecStatus').value;
+    const editId = document.getElementById('editElectionId').value;
+    if (!start || !end) return toast('Please fill all fields', 'error');
+    if (new Date(end) < new Date(start)) return toast('End date must be after start date', 'error');
+
+    if (editId) {
+      const e = db.elections.find(e => e.id == editId);
+      e.startDate = start; e.endDate = end; e.status = status;
+    } else {
+      db.elections.push({ id: db.nextElectionId++, startDate: start, endDate: end, status });
+    }
+    saveDB(db);
+    closeModal('election');
+    renderElections(); renderStats(); populateFilters(); updateSidebarCounts();
+    toast(editId ? 'Election updated' : 'Election created');
+    document.getElementById('editElectionId').value = '';
+    document.getElementById('electionModalTitle').textContent = 'New Election';
+  }
+
+  function saveCandidate() {
+    const name  = document.getElementById('candName').value.trim();
+    const party = document.getElementById('candParty').value.trim();
+    const elId  = parseInt(document.getElementById('candElection').value);
+    const coId  = parseInt(document.getElementById('candConstituency').value);
+    if (!name || !party || !elId || !coId) return toast('Please fill all fields', 'error');
+    db.candidates.push({ id: db.nextCandidateId++, fullName: name, party, electionId: elId, constituencyId: coId });
+    saveDB(db);
+    closeModal('candidate');
+    renderCandidates(); renderStats(); updateSidebarCounts();
+    toast('Candidate added');
+  }
+
+  function saveConstituency() {
+    const name   = document.getElementById('constName').value.trim();
+    const region = document.getElementById('constRegion').value.trim();
+    if (!name || !region) return toast('Please fill all fields', 'error');
+    db.constituencies.push({ id: db.nextConstituencyId++, name, region });
+    saveDB(db);
+    closeModal('constituency');
+    renderConstituencies(); renderStats(); updateSidebarCounts();
+    toast('Constituency added');
+  }
+
+  function toggleVoter(id) {
+    const v = db.voters.find(v => v.id === id);
+    if (v) {
+      v.status = v.status === 'active' ? 'inactive' : 'active';
+      saveDB(db); renderVoters(); renderStats();
+      toast('Voter status updated to ' + v.status);
+    }
+  }
+
+  // ── DELETE ──
+  let _deletePending = null;
+  function confirmDelete(type, id) {
+    const msgs = {
+      election: 'Delete this election? All associated votes will remain but the election will be removed.',
+      candidate: 'Remove this candidate from the election?',
+      voter: 'Delete this voter account? Their vote history will remain in the log.',
+      constituency: 'Remove this constituency?'
+    };
+    document.getElementById('deleteMsg').textContent = msgs[type];
+    document.getElementById('deleteConfirmBtn').onclick = () => doDelete(type, id);
+    openModal('delete');
+  }
+
+  function doDelete(type, id) {
+    if (type === 'election')     db.elections      = db.elections.filter(e => e.id !== id);
+    if (type === 'candidate')    db.candidates     = db.candidates.filter(c => c.id !== id);
+    if (type === 'voter')        db.voters         = db.voters.filter(v => v.id !== id);
+    if (type === 'constituency') db.constituencies = db.constituencies.filter(c => c.id !== id);
+    saveDB(db);
+    closeModal('delete');
+    renderElections(); renderCandidates(); renderVoters();
+    renderConstituencies(); renderStats(); updateSidebarCounts(); populateFilters();
+    toast('Deleted successfully');
+  }
+
+  // ── MODALS ──
+  function openModal(name) {
+    if (name === 'candidate') {
+      document.getElementById('candElection').innerHTML    = db.elections.map(e => `<option value="${e.id}">Election #${e.id} (${e.status})</option>`).join('');
+      document.getElementById('candConstituency').innerHTML = db.constituencies.map(c => `<option value="${c.id}">${c.name}, ${c.region}</option>`).join('');
+      document.getElementById('candName').value  = '';
+      document.getElementById('candParty').value = '';
+    }
+    if (name === 'constituency') {
+      document.getElementById('constName').value   = '';
+      document.getElementById('constRegion').value = '';
+    }
+    document.getElementById('modal-' + name).classList.add('open');
+  }
+
+  function closeModal(name) {
+    document.getElementById('modal-' + name).classList.remove('open');
+  }
+
+  document.querySelectorAll('.modal-overlay').forEach(o =>
+    o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); })
+  );
+
+  init();
+</script>
+</body>
+</html>

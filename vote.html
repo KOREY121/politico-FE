@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>E-voting — Cast Your Vote</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .vote-progress {
+    display: flex; align-items: center; gap: 0;
+    margin-bottom: 2.5rem; font-family: 'DM Mono', monospace;
+    font-size: .65rem; letter-spacing: 1px; text-transform: uppercase;
+  }
+  .progress-step {
+    display: flex; align-items: center; gap: 8px; color: var(--muted);
+  }
+  .progress-step.active { color: var(--gold); }
+  .progress-step.done   { color: var(--success); }
+  .progress-num {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: var(--border); display: flex; align-items: center;
+    justify-content: center; font-size: .62rem; font-weight: 600;
+    border: 1.5px solid var(--border); transition: all .3s;
+  }
+  .progress-step.active .progress-num { background: var(--gold); color: var(--ink); border-color: var(--gold); }
+  .progress-step.done   .progress-num { background: var(--success); color: #fff; border-color: var(--success); }
+  .progress-line {
+    width: 48px; height: 1px; background: var(--border); margin: 0 8px;
+  }
+  .progress-line.done { background: var(--success); }
+
+  /* Election list */
+  .elections-list { max-width: 700px; }
+
+  /* Candidate vote section */
+  .vote-section { max-width: 900px; }
+
+  .constituency-filter {
+    display: flex; gap: .6rem; flex-wrap: wrap; margin-bottom: 1.5rem;
+  }
+  .filter-pill {
+    padding: 6px 16px; border-radius: 100px;
+    font-family: 'DM Mono', monospace; font-size: .63rem;
+    letter-spacing: 1px; text-transform: uppercase; cursor: pointer;
+    border: 1.5px solid var(--border); background: none; color: var(--muted);
+    transition: all .2s;
+  }
+  .filter-pill.active { border-color: var(--gold); color: var(--gold); background: var(--gold-dim); }
+
+  /* Already voted banner */
+  .voted-banner {
+    background: #d4f5e4; border: 1px solid rgba(45,122,79,.3);
+    border-radius: 4px; padding: 1rem 1.4rem;
+    display: flex; align-items: center; gap: 12px;
+    font-size: .85rem; color: var(--success); margin-top: .5rem;
+  }
+  .voted-banner .icon { font-size: 1.2rem; }
+
+  /* Success screen */
+  .success-screen {
+    display: none; text-align: center;
+    padding: 4rem 2rem;
+  }
+  .success-icon {
+    width: 80px; height: 80px; border-radius: 50%;
+    background: var(--success); display: flex; align-items: center;
+    justify-content: center; font-size: 2rem; color: #fff;
+    margin: 0 auto 1.5rem;
+    animation: popIn .5s cubic-bezier(.18,.89,.32,1.28);
+  }
+  @keyframes popIn {
+    from { transform: scale(0); opacity: 0; }
+    to   { transform: scale(1); opacity: 1; }
+  }
+  .success-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.5rem; letter-spacing: 3px; margin-bottom: .5rem;
+  }
+  .receipt-card {
+    max-width: 400px; margin: 2rem auto 0;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 4px; padding: 1.5rem; text-align: left;
+  }
+  .receipt-row {
+    display: flex; justify-content: space-between;
+    font-size: .82rem; padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .receipt-row:last-child { border-bottom: none; }
+  .receipt-key { color: var(--muted); font-family: 'DM Mono', monospace; font-size: .65rem; letter-spacing: 1px; text-transform: uppercase; }
+  .receipt-val { font-weight: 600; font-family: 'DM Mono', monospace; font-size: .72rem; }
+
+  .timeline { display: flex; flex-direction: column; gap: .4rem; margin-top: 1rem; }
+  .timeline-item {
+    display: flex; align-items: center; gap: 10px;
+    font-family: 'DM Mono', monospace; font-size: .65rem; color: var(--muted);
+  }
+  .timeline-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="nav-logo" href="index.html">INDEPENDENT NATIONAL ELECTORAL<span>COMMISSION</span></a>
+  <div class="nav-links">
+    <a href="vote.html" class="active">Cast Vote</a>
+    <a href="results.html">Results</a>
+    <span class="nav-user" id="navUser"></span>
+    <button class="nav-logout" onclick="doLogout()">Logout</button>
+  </div>
+</nav>
+
+<div class="page-wrap">
+
+  <!-- STEP PROGRESS -->
+  <div class="vote-progress" id="voteProgress">
+    <div class="progress-step active" id="step1">
+      <span class="progress-num">1</span> Select Election
+    </div>
+    <div class="progress-line" id="line1"></div>
+    <div class="progress-step" id="step2">
+      <span class="progress-num">2</span> Choose Candidate
+    </div>
+    <div class="progress-line" id="line2"></div>
+    <div class="progress-step" id="step3">
+      <span class="progress-num">3</span> Confirm
+    </div>
+  </div>
+
+  <!-- ── STEP 1: SELECT ELECTION ── -->
+  <div id="stepView1">
+    <div class="page-header">
+      <div class="page-header-left">
+        <h1>Active Elections</h1>
+        <div class="sub">Select an election to cast your vote</div>
+      </div>
+      <div id="voterChipWrap"></div>
+    </div>
+    <div class="elections-list" id="electionsList"></div>
+  </div>
+
+  <!-- ── STEP 2: CHOOSE CANDIDATE ── -->
+  <div id="stepView2" style="display:none;">
+    <button class="step-back" onclick="goToStep1()">← Back to Elections</button>
+    <div class="page-header">
+      <div class="page-header-left">
+        <h1 id="electionHeading">Choose Candidate</h1>
+        <div class="sub" id="electionSubheading"></div>
+      </div>
+    </div>
+
+    <div id="constituencyFilterWrap">
+      <div style="font-family:'DM Mono',monospace; font-size:.62rem; color:var(--muted); letter-spacing:1px; text-transform:uppercase; margin-bottom:.7rem;">Filter by Constituency</div>
+      <div class="constituency-filter" id="constituencyFilter"></div>
+    </div>
+
+    <div class="candidates-grid" id="candidatesGrid"></div>
+
+    <div class="confirm-area" id="confirmArea" style="display:none;">
+      <div class="sel-info">
+        <div class="sel-name" id="selCandName"></div>
+        <div class="sel-party" id="selCandParty"></div>
+      </div>
+      <button class="btn btn-primary" onclick="goToStep3()">Proceed to Confirm →</button>
+    </div>
+  </div>
+
+  <!-- ── STEP 3: CONFIRM ── -->
+  <div id="stepView3" style="display:none;">
+    <button class="step-back" onclick="goToStep2()">← Change Selection</button>
+    <div class="page-header">
+      <div class="page-header-left">
+        <h1>Confirm Your Vote</h1>
+        <div class="sub">Review before submitting — this action is final</div>
+      </div>
+    </div>
+
+    <div style="max-width:520px;">
+      <div class="card" style="border-top: 4px solid var(--gold);">
+        <div style="font-family:'Bebas Neue',sans-serif; font-size:1.2rem; letter-spacing:2px; margin-bottom:1.4rem;">Vote Summary</div>
+
+        <div class="receipt-row"><span class="receipt-key">Election</span><span class="receipt-val" id="confElection"></span></div>
+        <div class="receipt-row"><span class="receipt-key">Candidate</span><span class="receipt-val" id="confCandidate"></span></div>
+        <div class="receipt-row"><span class="receipt-key">Party</span><span class="receipt-val" id="confParty"></span></div>
+        <div class="receipt-row"><span class="receipt-key">Constituency</span><span class="receipt-val" id="confConstituency"></span></div>
+        <div class="receipt-row"><span class="receipt-key">Voter</span><span class="receipt-val" id="confVoter"></span></div>
+        <div class="receipt-row"><span class="receipt-key">Timestamp</span><span class="receipt-val" id="confTime"></span></div>
+
+        <div style="margin-top:1.5rem; padding:1rem; background:rgba(192,57,43,.05); border:1px solid rgba(192,57,43,.2); border-radius:3px; font-size:.8rem; color:var(--danger);">
+          ⚠ Once submitted, your vote cannot be changed or recalled.
+        </div>
+
+        <div style="display:flex; gap:1rem; margin-top:1.5rem;">
+          <button class="btn btn-success" onclick="submitVote()" style="flex:1;">✓ Submit Vote</button>
+          <button class="btn btn-outline" onclick="goToStep1()">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SUCCESS SCREEN ── -->
+  <div class="success-screen" id="successScreen">
+    <div class="success-icon">✓</div>
+    <div class="success-title">Vote Submitted!</div>
+    <p style="color:var(--muted); max-width:380px; margin:0 auto; font-size:.9rem;">Your vote has been securely recorded. Thank you for participating in the democratic process.</p>
+
+    <div class="receipt-card">
+      <div style="font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin-bottom:.8rem;">Vote Receipt</div>
+      <div class="receipt-row"><span class="receipt-key">Receipt ID</span><span class="receipt-val" id="receiptId"></span></div>
+      <div class="receipt-row"><span class="receipt-key">Candidate</span><span class="receipt-val" id="receiptCandidate"></span></div>
+      <div class="receipt-row"><span class="receipt-key">Election</span><span class="receipt-val" id="receiptElection"></span></div>
+      <div class="receipt-row"><span class="receipt-key">Time</span><span class="receipt-val" id="receiptTime"></span></div>
+    </div>
+
+    <div style="margin-top:2rem; display:flex; gap:1rem; justify-content:center;">
+      <a href="results.html" class="btn btn-dark">View Results →</a>
+      <button class="btn btn-outline" onclick="resetVote()">Vote in Another Election</button>
+    </div>
+  </div>
+
+</div><!-- /page-wrap -->
+
+<!-- MODAL: Admin override -->
+<div class="modal-overlay" id="modal-voted">
+  <div class="modal">
+    <h2>Already Voted</h2>
+    <p class="modal-sub">You have already cast your vote in this election. Each voter may only vote once per election.</p>
+    <div class="modal-actions">
+      <button class="btn btn-dark" onclick="closeModal('voted')">OK</button>
+      <a href="results.html" class="btn btn-outline">See Results</a>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script src="shared.js"></script>
+<script>
+  // ── AUTH ──
+  const currentVoter = requireVoterAuth();
+  if (currentVoter) {
+    document.getElementById('navUser').textContent = currentVoter.fullName;
+  }
+
+  let db, selectedElection = null, selectedCandidateId = null, activeConstituency = 'all';
+
+  function doLogout() { clearSession(); window.location.href = 'index.html'; }
+
+  function init() {
+    db = getDB();
+    document.getElementById('voterChipWrap').innerHTML =
+      `<span class="voter-chip"><span class="dot-live"></span>${currentVoter.fullName} · ${currentVoter.nationalId}</span>`;
+    renderElections();
+  }
+
+  // ── STEP 1 ──
+  function renderElections() {
+    const active = db.elections.filter(e => e.status === 'active');
+    const list = document.getElementById('electionsList');
+
+    if (!active.length) {
+      list.innerHTML = `<div class="empty-state"><span class="icon">🗳</span>No active elections at this time.<br>Check back soon.</div>`;
+      return;
+    }
+
+    list.innerHTML = active.map(e => {
+      const hasVoted = db.votes.some(v => v.voterId === currentVoter.id && v.electionId === e.id);
+      const candCount = db.candidates.filter(c => c.electionId === e.id).length;
+      return `
+      <div class="election-card ${hasVoted ? 'voted' : ''}" onclick="${hasVoted ? "openModal('voted')" : `selectElection(${e.id})`}">
+        <div class="election-card-top">
+          <h3>General Election #${e.id}</h3>
+          ${hasVoted ? '<span class="badge badge-active">Voted ✓</span>' : '<span class="badge badge-pending">Open</span>'}
+        </div>
+        <div class="meta">📅 ${e.startDate} → ${e.endDate}</div>
+        <div class="meta">👥 ${candCount} Candidate${candCount !== 1 ? 's' : ''} registered</div>
+        ${hasVoted
+          ? `<div class="voted-banner"><span class="icon">✅</span>You have already voted in this election.</div>`
+          : `<div class="cta">Tap to vote →</div>`
+        }
+      </div>`;
+    }).join('');
+  }
+
+  // ── STEP 2 ──
+  function selectElection(id) {
+    selectedElection = db.elections.find(e => e.id === id);
+    selectedCandidateId = null;
+    activeConstituency = 'all';
+    setProgress(2);
+    document.getElementById('stepView1').style.display = 'none';
+    document.getElementById('stepView2').style.display = 'block';
+    document.getElementById('electionHeading').textContent = `Election #${id} — Choose Candidate`;
+    document.getElementById('electionSubheading').textContent = `${selectedElection.startDate} → ${selectedElection.endDate}`;
+    renderConstituencyFilter(id);
+    renderCandidates(id, 'all');
+    document.getElementById('confirmArea').style.display = 'none';
+  }
+
+  function renderConstituencyFilter(elId) {
+    const candConstIds = [...new Set(db.candidates.filter(c => c.electionId === elId).map(c => c.constituencyId))];
+    const constituencies = db.constituencies.filter(c => candConstIds.includes(c.id));
+    const wrap = document.getElementById('constituencyFilter');
+    wrap.innerHTML = `<button class="filter-pill active" onclick="filterConst('all', this)">All</button>` +
+      constituencies.map(c => `<button class="filter-pill" onclick="filterConst(${c.id}, this)">${c.name}</button>`).join('');
+  }
+
+  function filterConst(id, btn) {
+    activeConstituency = id;
+    document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderCandidates(selectedElection.id, id);
+  }
+
+  function renderCandidates(elId, constFilter) {
+    let candidates = db.candidates.filter(c => c.electionId === elId);
+    if (constFilter !== 'all') candidates = candidates.filter(c => c.constituencyId == constFilter);
+    const grid = document.getElementById('candidatesGrid');
+
+    if (!candidates.length) {
+      grid.innerHTML = `<div class="empty-state"><span class="icon">🔍</span>No candidates found for this filter.</div>`;
+      return;
+    }
+
+    grid.innerHTML = candidates.map(c => {
+      const con = db.constituencies.find(co => co.id === c.constituencyId);
+      const isSelected = selectedCandidateId === c.id;
+      return `
+      <div class="candidate-card ${isSelected ? 'selected' : ''}" id="cc-${c.id}" onclick="selectCandidate(${c.id})">
+        <span class="check">✓</span>
+        <div class="candidate-avatar">${initials(c.fullName)}</div>
+        <div class="candidate-name">${c.fullName}</div>
+        <div class="candidate-party">${c.party}</div>
+        <div class="candidate-constituency">${con ? con.name + ', ' + con.region : ''}</div>
+      </div>`;
+    }).join('');
+  }
+
+  function selectCandidate(id) {
+    selectedCandidateId = id;
+    document.querySelectorAll('.candidate-card').forEach(c => c.classList.remove('selected'));
+    const el = document.getElementById('cc-' + id);
+    if (el) el.classList.add('selected');
+    const cand = db.candidates.find(c => c.id === id);
+    document.getElementById('selCandName').textContent = cand.fullName;
+    document.getElementById('selCandParty').textContent = cand.party;
+    document.getElementById('confirmArea').style.display = 'flex';
+  }
+
+  // ── STEP 3 ──
+  function goToStep3() {
+    if (!selectedCandidateId) return toast('Please select a candidate', 'error');
+    const cand = db.candidates.find(c => c.id === selectedCandidateId);
+    const con  = db.constituencies.find(c => c.id === cand.constituencyId);
+    setProgress(3);
+    document.getElementById('stepView2').style.display = 'none';
+    document.getElementById('stepView3').style.display = 'block';
+    document.getElementById('confElection').textContent    = `Election #${selectedElection.id}`;
+    document.getElementById('confCandidate').textContent   = cand.fullName;
+    document.getElementById('confParty').textContent       = cand.party;
+    document.getElementById('confConstituency').textContent = con ? con.name + ', ' + con.region : '—';
+    document.getElementById('confVoter').textContent       = currentVoter.fullName + ' · ' + currentVoter.nationalId;
+    document.getElementById('confTime').textContent        = new Date().toLocaleString();
+  }
+
+  function submitVote() {
+    db = getDB();
+    // Double-check not already voted
+    if (db.votes.some(v => v.voterId === currentVoter.id && v.electionId === selectedElection.id)) {
+      return toast('You have already voted in this election', 'error');
+    }
+    const voteId = db.nextVoteId++;
+    const time = new Date().toISOString();
+    db.votes.push({ id: voteId, voterId: currentVoter.id, candidateId: selectedCandidateId, electionId: selectedElection.id, time });
+    saveDB(db);
+
+    const cand = db.candidates.find(c => c.id === selectedCandidateId);
+
+    // Show success
+    document.getElementById('stepView3').style.display = 'none';
+    document.getElementById('voteProgress').style.display = 'none';
+    const ss = document.getElementById('successScreen');
+    ss.style.display = 'block';
+    document.getElementById('receiptId').textContent    = 'VT-' + String(voteId).padStart(6, '0');
+    document.getElementById('receiptCandidate').textContent = cand.fullName;
+    document.getElementById('receiptElection').textContent  = `Election #${selectedElection.id}`;
+    document.getElementById('receiptTime').textContent      = new Date(time).toLocaleString();
+  }
+
+  function resetVote() {
+    db = getDB();
+    selectedElection = null; selectedCandidateId = null;
+    document.getElementById('successScreen').style.display = 'none';
+    document.getElementById('voteProgress').style.display = 'flex';
+    setProgress(1);
+    document.getElementById('stepView1').style.display = 'block';
+    renderElections();
+  }
+
+  // ── NAV ──
+  function goToStep1() {
+    selectedCandidateId = null; selectedElection = null;
+    setProgress(1);
+    document.getElementById('stepView2').style.display = 'none';
+    document.getElementById('stepView3').style.display = 'none';
+    document.getElementById('stepView1').style.display = 'block';
+  }
+
+  function goToStep2() {
+    setProgress(2);
+    document.getElementById('stepView3').style.display = 'none';
+    document.getElementById('stepView2').style.display = 'block';
+  }
+
+  function setProgress(n) {
+    for (let i = 1; i <= 3; i++) {
+      const s = document.getElementById('step' + i);
+      s.classList.remove('active', 'done');
+      if (i < n) s.classList.add('done');
+      else if (i === n) s.classList.add('active');
+    }
+    for (let i = 1; i <= 2; i++) {
+      const l = document.getElementById('line' + i);
+      l.classList.toggle('done', i < n);
+    }
+  }
+
+  function openModal(name) { document.getElementById('modal-' + name).classList.add('open'); }
+  function closeModal(name) { document.getElementById('modal-' + name).classList.remove('open'); }
+
+  document.querySelectorAll('.modal-overlay').forEach(o =>
+    o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); })
+  );
+
+  init();
+</script>
+</body>
+</html>
+
+
+
