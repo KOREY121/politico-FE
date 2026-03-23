@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
-import { useNavigate }         from 'react-router-dom';
-import { useAuth }             from '../context/useAuth';
-import { authAPI, electionsAPI} from '../api/api';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/useAuth';
+import { authAPI, electionsAPI } from '../api/api';
 
 export default function LoginPage() {
   const { login, voter } = useAuth();
-  const navigate         = useNavigate();
+  const navigate = useNavigate();
 
-  const [tab,     setTab]     = useState('login');
-  const [error,   setError]   = useState('');
+  const [tab, setTab] = useState('login');
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   // Hero stats
@@ -20,14 +20,14 @@ export default function LoginPage() {
   const [loginData, setLoginData] = useState({ national_id: '', password: '' });
 
   // Register form
-  const [regData,   setRegData]   = useState({
+  const [regData, setRegData] = useState({
     full_name: '', national_id: '', dob: '',
     email: '', password: '', password2: ''
   });
 
   // Password strength
-  const [pwdWidth,  setPwdWidth]  = useState('0%');
-  const [pwdColor,  setPwdColor]  = useState('');
+  const [pwdWidth, setPwdWidth] = useState('0%');
+  const [pwdColor, setPwdColor] = useState('');
 
   // Redirect if already logged in
   useEffect(() => {
@@ -40,7 +40,7 @@ export default function LoginPage() {
   useEffect(() => {
     async function loadStats() {
       try {
-        const res  = await electionsAPI.active();
+        const res = await electionsAPI.active();
         const data = await res.json();
         setHeroElections(data.length);
       } catch { setHeroElections(0); }
@@ -57,7 +57,7 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
     try {
-      const res  = await authAPI.login(loginData.national_id, loginData.password);
+      const res = await authAPI.login(loginData.national_id, loginData.password);
       const data = await res.json();
       if (res.ok) {
         login(data.voter, data.tokens);
@@ -69,10 +69,10 @@ export default function LoginPage() {
       setError('Network error. Please try again.');
     }
     setLoading(false);
-  }useEffect(() => {
-  document.body.style.background = 'var(--ink)';
-  return () => { document.body.style.background = ''; };
-}, []);
+  } useEffect(() => {
+    document.body.style.background = 'var(--ink)';
+    return () => { document.body.style.background = ''; };
+  }, []);
 
   // ── REGISTER ──
   async function handleRegister(e) {
@@ -90,11 +90,19 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
     try {
-      const res  = await authAPI.register(regData);
+      const res = await authAPI.register(regData);
       const data = await res.json();
       if (res.ok) {
-        login(data.voter, data.tokens);
-        navigate('/vote');
+        setTab('login');
+        setRegData({
+          full_name: '',
+          national_id: '',
+          dob: '',
+          email: '',
+          password: '',
+          password2: ''
+        });
+        setError('Registration successful! Please login with your credentials.');
       } else {
         const first = Object.values(data)[0];
         setError(Array.isArray(first) ? first[0] : first);
@@ -108,7 +116,7 @@ export default function LoginPage() {
   // ── PASSWORD STRENGTH ──
   function checkStrength(value) {
     let score = 0;
-    if (value.length >= 6)  score++;
+    if (value.length >= 6) score++;
     if (value.length >= 10) score++;
     if (/[A-Z]/.test(value) && /[0-9]/.test(value)) score++;
     const colors = ['', '#c0392b', '#e67e22', '#2d7a4f'];
@@ -221,10 +229,9 @@ export default function LoginPage() {
               <span
                 className="admin-link"
                 onClick={() => {
-                  setLoginData({ national_id: '1234567890', password: 'yourpassword' });
-                  setTab('login');
+                  setLoginData({ national_id: '1234567890', password: 'yourpassword123' });
                 }}>
-                ⚙ Admin Portal
+                ⚙ Fill Admin Credentials
               </span>
             </div>
           </form>
