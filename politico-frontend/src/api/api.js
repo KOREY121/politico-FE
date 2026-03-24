@@ -81,6 +81,9 @@ export const authAPI = {
   register: (data) =>
     request('/auth/register/', 'POST', data, false),
 
+  adminRegister: (data) =>           
+    request('/auth/admin/register/', 'POST', data, false),
+
   login: (national_id, password) =>
     request('/auth/login/', 'POST', { national_id, password }, false),
 
