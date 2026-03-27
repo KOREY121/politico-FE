@@ -52,12 +52,14 @@ export default function LoginPage() {
   // ── LOGIN ──
   async function handleLogin(e) {
     e.preventDefault();
+    console.log('loginData:', loginData);
     if (!loginData.national_id || !loginData.password) return setError('Please enter your credentials.');
     setLoading(true); setError('');
     try {
       const res  = await authAPI.login(loginData.national_id, loginData.password);
       const data = await res.json();
       if (res.ok) {
+        console.log('is_staff:', data.voter.is_staff);
         login(data.voter, data.tokens);
         navigate(data.voter.is_staff ? '/admin' : '/vote');
       } else {
