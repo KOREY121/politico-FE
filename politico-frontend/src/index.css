@@ -574,3 +574,74 @@ body.login { background: var(--ink); }
   .hero-panel { display: none; }
   .form-panel { padding: 2rem 1.5rem; justify-content: flex-start; padding-top: 5rem; }
 }
+
+
+/* ── ELECTION SELECTOR PILLS (Results Page) ── */
+.election-selector {
+  display: flex;
+  gap: .6rem;
+  flex-wrap: wrap;
+  margin-bottom: 2rem;
+}
+
+.elec-pill {
+  padding: 8px 20px;
+  border-radius: 100px;
+  font-family: 'DM Mono', monospace;
+  font-size: .65rem;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  border: 1.5px solid var(--border);
+  background: none;
+  color: var(--muted);
+  transition: all .2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.elec-pill:hover {
+  border-color: var(--gold);
+  color: var(--ink);
+}
+
+.elec-pill.active {
+  border-color: var(--gold);
+  color: var(--ink);
+  background: var(--gold-dim);
+  font-weight: 600;
+}
+
+/* ── CONSTITUENCY FILTER PILLS (Vote Page) ── */
+.constituency-filter {
+  display: flex;
+  gap: .6rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.filter-pill {
+  padding: 6px 16px;
+  border-radius: 100px;
+  font-family: 'DM Mono', monospace;
+  font-size: .63rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  border: 1.5px solid var(--border);
+  background: none;
+  color: var(--muted);
+  transition: all .2s;
+}
+
+.filter-pill:hover {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.filter-pill.active {
+  border-color: var(--gold);
+  color: var(--gold);
+  background: var(--gold-dim);
+}
